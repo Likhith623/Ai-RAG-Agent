@@ -292,10 +292,10 @@ except Exception as e:
 
 # Keys
 
-os.environ['SERPER_API_KEY'] = os.getenv('SERPER_API_KEY', '466566d438018e3a7e3c81eec446ad3de2fe660a')
-os.environ['NEWSAPI_KEY'] = os.getenv('NEWSAPI_KEY', '6db5db5f7f834630996ac6b8bfd7dfc8')
-os.environ['NOVITA_API_KEY'] = os.getenv('NOVITA_API_KEY', 'ff98a4b3-3628-4433-8231-f3a0017ccd7c')
-os.environ['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', 'AIzaSyDOmcCIWHcLM1KpaBI04T5BBIitDZ-WfT8')
+os.environ['SERPER_API_KEY'] = os.getenv('SERPER_API_KEY', 'Your_serper_key')
+os.environ['NEWSAPI_KEY'] = os.getenv('NEWSAPI_KEY', 'Your_newsapi_key')
+os.environ['NOVITA_API_KEY'] = os.getenv('NOVITA_API_KEY', 'Your_Novita_key')
+os.environ['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', 'Your_Gemini_key')
 # Add this after the API keys section:
 
 # Replace the existing call_GEMINI_ai function with this:
