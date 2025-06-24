@@ -169,12 +169,6 @@ For frontend, set `NEXT_PUBLIC_API_URL` in `.env.local` or `.env.production`.
 Pull requests and issues are welcome!  
 Please open an issue for bugs, feature requests, or questions.
 
----
-
-## 🛡️ License
-
-MIT License.  
-See [LICENSE](LICENSE) for details.
 
 ---
 
