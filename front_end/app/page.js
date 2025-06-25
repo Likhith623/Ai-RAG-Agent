@@ -24,6 +24,7 @@ export default function ChatInterface() {
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
 
+
   // API base URL - your Flask server
     // API base URL - your Flask server
   
@@ -108,7 +109,22 @@ export default function ChatInterface() {
     setIsSignedIn(true);
     await loadConversations(userEmail);
   };
-
+const WebSearchOnlyLink = ({ href, children }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="web-search-link"
+    style={{
+      color: '#2563eb', // Tailwind blue-600
+      textDecoration: 'underline',
+      fontWeight: 500,
+      wordBreak: 'break-all'
+    }}
+  >
+    {children}
+  </a>
+);
   const loadConversations = async (email) => {
     try {
       const response = await axios.post(`${API_BASE}/api/conversations`, {
@@ -150,7 +166,12 @@ else if (msg.role === 'assistant') {
   ) {
     mode = 'website_summary';
   }
-
+  else if (
+    (msg.mode && msg.mode === 'web_search_only') ||
+    (msg.query_type && msg.query_type.trim().toLowerCase() === 'web_search_only')
+  ) {
+    mode = 'web_search_only';
+  }
   // Debug log
   console.log('Assistant message:', { mode, assistantContent, msg });
 
@@ -177,6 +198,7 @@ else if (msg.role === 'assistant') {
         
         setMessages(transformedMessages);
         setCurrentConversation(conversationId);
+        
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -192,6 +214,7 @@ else if (msg.role === 'assistant') {
       if (response.data.conversation) {
         setMessages([]);
         setCurrentConversation(response.data.conversation.id);
+        
         await loadConversations(userEmail);
       }
     } catch (error) {
@@ -199,6 +222,7 @@ else if (msg.role === 'assistant') {
       // Fallback: clear current conversation
       setMessages([]);
       setCurrentConversation(null);
+      
     }
   };
 
@@ -296,10 +320,10 @@ else if (msg.role === 'assistant') {
   };
   const sendMessage = async () => {
     if (!input.trim() || !isSignedIn || isLoading) return;
-     
-
       const mode = getLoadingMode();
-  setLoadingMode(mode);
+      setLoadingMode(mode);
+
+  
 
     const userMessage = {
       id: Date.now().toString(),
@@ -311,7 +335,7 @@ else if (msg.role === 'assistant') {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
-    setShowSteps(true);
+
 
     try {
       console.log('🚀 Sending request to:', `${API_BASE}/api/news`);
@@ -335,27 +359,33 @@ else if (msg.role === 'assistant') {
 
        console.log('🟢 Backend response:', response.data);
 
-      if (response.data.status === 'success') {
-        // Use the direct AI response from your backend
-        const aiResponse = response.data.result || response.data.ai_response;
 
-        const assistantMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date().toISOString(),
-          web_results: response.data.web_results,
-          rag_context: response.data.rag_context,
-          mode: response.data.mode || 'regular_search' // Capture the mode from backend
-        };
 
-        setMessages(prev => [...prev, assistantMessage]);
-        
-        // Update current conversation ID if a new one was created
-        if (response.data.conversation_id && response.data.conversation_id !== currentConversation) {
-          setCurrentConversation(response.data.conversation_id);
-        }
-        
+    if (response.data.status === 'success') {
+      const aiResponse = response.data.result || response.data.ai_response;
+      const backendMode = response.data.mode || 'regular_search';
+
+      // Set showSteps based on backend mode
+      setShowSteps(backendMode === 'rag_search');
+
+      setLoadingMode(backendMode);
+      
+
+      const assistantMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+        web_results: response.data.web_results,
+        rag_context: response.data.rag_context,
+        mode: backendMode
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      if (response.data.conversation_id && response.data.conversation_id !== currentConversation) {
+        setCurrentConversation(response.data.conversation_id);
+      }
+   
         // Reload conversations to update sidebar
         await loadConversations(userEmail);
       }} catch (error) {
@@ -428,6 +458,7 @@ else if (msg.role === 'assistant') {
     setMessages([]);
     setConversations([]);
     setCurrentConversation(null);
+    
   };
   const formatTimeAgo = (dateString) => {
     if (!dateString) return 'just now';
@@ -712,6 +743,17 @@ const getLoadingMode = () => {
   if (input && summaryPatterns.some((pat) => pat.test(input))) {
     return 'document_summary';
   }
+
+
+
+  // For any other input, always let backend decide (default to 'rag_search' for loading animation)
+  if (input && input.trim().length > 0) {
+    return 'rag_search';
+  }
+
+
+
+
   return 'rag_search';
 };
 
@@ -1253,8 +1295,14 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
         </div>
       )}
 
-      {/* ASSISTANT MESSAGE: Regular search (3-step UI) */}
-{message.role === 'assistant' && (!message.mode || message.mode === 'regular_search' || message.mode === 'rag_search') && !message.isError && (
+
+{/* ASSISTANT MESSAGE: Regular search (3-step UI) */}
+{message.role === 'assistant' && 
+  (
+    !message.mode ||
+    message.mode === 'regular_search' ||
+    message.mode === 'rag_search'
+  ) && !message.isError && (
   <>
     {/* Web results if present */}
     {message.web_results && message.web_results.length > 0 && (
@@ -1269,6 +1317,35 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
     />
   </>
 )}
+
+{/* ASSISTANT MESSAGE: Web search only (simple response, no steps) */}
+
+
+{message.role === 'assistant' && message.mode === 'web_search_only' && !message.isError && (
+  <div className="prose max-w-full prose-sm prose-slate dark:prose-invert break-words whitespace-pre-wrap">
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: WebSearchOnlyLink,
+        code({node, inline, className, children, ...props}) {
+          return !inline ? (
+            <pre className="overflow-x-auto rounded-lg bg-gray-900 text-white p-3 my-2 text-sm">
+              <code {...props}>{children}</code>
+            </pre>
+          ) : (
+            <code className="bg-gray-200 dark:bg-gray-800 rounded px-1 break-words">{children}</code>
+          );
+        }
+      }}
+    >
+      {message.content}
+    </ReactMarkdown>
+  </div>
+)}
+
+
+
+
       {/* Timestamp and mode info */}
       <div className={`mt-2 text-xs flex items-center space-x-2 ${
         message.role === 'user'
@@ -1361,42 +1438,36 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
       </div>
     )}
 
-    {/* 3-step process loading for RAG/document search */}
-    {loadingMode === 'rag_search' && showSteps && (
-      <div className="flex items-start space-x-4" style={{ animation: 'slideInFromBottom 0.5s ease-out' }}>
-        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center animate-pulse">
-          <span className="text-white">🤖</span>
+    {(loadingMode === 'rag_search' || loadingMode === 'web_search_only') && (
+      <div className="flex items-center space-x-3 py-8">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-r from-blue-500 to-purple-600">
+          <span className="text-white text-sm">🤖</span>
         </div>
-        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl rounded-bl-lg p-6 shadow-xl border transition-colors duration-300 max-w-4xl`}>
-          <div className="space-y-4">
-            {/* Step 1: Web Search */}
-            <div className="flex items-center space-x-2" style={{ animation: 'slideInFromLeft 0.3s ease-out' }}>
-              <span className="animate-spin text-blue-500 text-xl">🌐</span>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Step 1: Searching the web...</span>
-            </div>
-            {/* Step 2: Document Analysis */}
-            <div className="flex items-center space-x-2" style={{ animation: 'slideInFromLeft 0.3s ease-out 1s both' }}>
-              <span className="animate-pulse text-purple-500 text-xl">📄</span>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Step 2: Summarizing your document...</span>
-            </div>
-            {/* Step 3: AI Response */}
-            <div className="flex items-center space-x-2" style={{ animation: 'slideInFromLeft 0.3s ease-out 2s both' }}>
-              <span className="animate-bounce text-green-500 text-xl">💬</span>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Step 3: Generating detailed response...</span>
-            </div>
-            {/* Show Step 3 loading state */}
-            <div style={{ animation: 'slideInFromLeft 0.3s ease-out 3s both' }}>
-              <AIResponseGeneration aiResponse={null} isLoading={true} />
-            </div>
-          </div>
-          <p className={`mt-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            AI is thinking...
-          </p>
+        <div className="flex items-center h-8">
+          <span className="dot-animate bg-blue-400"></span>
+          <span className="dot-animate bg-purple-500" style={{ animationDelay: '0.14s' }}></span>
+          <span className="dot-animate bg-green-500" style={{ animationDelay: '0.28s' }}></span>
         </div>
+        <style jsx>{`
+          .dot-animate {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: politeBounceDot 1s infinite;
+          }
+          @keyframes politeBounceDot {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-4px); }
+          }
+        `}</style>
       </div>
     )}
   </>
 )}
+
+
 
 
 

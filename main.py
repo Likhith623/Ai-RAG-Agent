@@ -64,6 +64,7 @@ embedding_model = None
 conversation_documents = {}      # {conversation_id: [chunks]}
 conversation_embeddings = {}     # {conversation_id: np.array}
 conversation_faiss_index = {}    # {conversation_id: faiss.IndexFlatIP}
+document_usage_tracker = {}
 
 print("✅ Backend starting in WEB-ONLY mode (RAG disabled)")
 
@@ -292,10 +293,10 @@ except Exception as e:
 
 # Keys
 
-os.environ['SERPER_API_KEY'] = os.getenv('SERPER_API_KEY', 'Your_serper_key')
-os.environ['NEWSAPI_KEY'] = os.getenv('NEWSAPI_KEY', 'Your_newsapi_key')
-os.environ['NOVITA_API_KEY'] = os.getenv('NOVITA_API_KEY', 'Your_Novita_key')
-os.environ['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', 'Your_Gemini_key')
+os.environ['SERPER_API_KEY'] = os.getenv('SERPER_API_KEY', 'your_key')
+os.environ['NEWSAPI_KEY'] = os.getenv('NEWSAPI_KEY', 'your_key')
+os.environ['NOVITA_API_KEY'] = os.getenv('NOVITA_API_KEY', 'your_key')
+os.environ['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', 'your_key')
 # Add this after the API keys section:
 
 # Replace the existing call_GEMINI_ai function with this:
@@ -327,6 +328,54 @@ def call_gemini_ai(prompt, max_tokens=700):
         import traceback
         traceback.print_exc()
         return None
+
+# ...existing code...
+
+def call_gemini_ai_web_only(query):
+    """
+    Call Gemini AI for a direct answer to a user's query (web-only, no document context).
+    Uses a highly detailed, accurate prompt for maximum precision and completeness.
+    """
+    print("🤖 [Web-only] Calling Gemini AI for direct query...")
+
+    # Fetch more web results for richer context
+    web_results = get_universal_web_search(query, num_results=5)
+
+    # Build a reference-rich prompt
+    web_refs = ""
+    for i, result in enumerate(web_results):
+        web_refs += f"{i+1}. {result.get('title', '')}\n   {result.get('description', '')}\n   {result.get('url', '')}\n"
+
+    prompt = (
+        f"You are an advanced, highly accurate, and reliable AI assistant. "
+        f"Your task is to answer the following user question with depth, clarity, and structure, "
+        f"using only the most up-to-date and relevant information from the provided web search results. "
+        f"Always synthesize information from multiple sources, provide clear explanations, and cite facts or links where appropriate.\n\n"
+        f"User Question: \"{query}\"\n\n"
+        f"Web Search Results:\n"
+        f"{web_refs}\n"
+        f"Instructions:\n"
+        f"1. Provide a direct, complete, and well-structured answer to the user's question.\n"
+        f"2. Use bullet points, numbered lists, or paragraphs as appropriate for clarity.\n"
+        f"3. Reference and synthesize information from multiple web results, not just the first one.\n"
+        f"4. Include relevant facts, definitions, examples, and links from the search results.\n"
+        f"5. If the question is about a person, summarize the most relevant profiles or pages, including links.\n"
+        f"6. If the question is about a process, method, or topic, explain it step-by-step or in detail, referencing the sources.\n"
+        f"7. If the search results are ambiguous or cover multiple topics, clarify the most likely intent and answer accordingly.\n"
+        f"8. Do NOT ask the user for more information. Do NOT reference uploaded documents or previous conversations.\n"
+        f"9. If no relevant information is found, say so politely and suggest what the user could try next.\n"
+        f"10. Always write in a professional, neutral, and helpful tone.\n"
+        f"11. Format the answer for easy reading, using markdown if appropriate.\n"
+        f"12. Do not repeat the question verbatim in your answer; instead, provide a natural, informative response.\n"
+        f"13. If the question is about a recent event, summarize the latest findings or news from the web results.\n"
+        f"14. If the question is about a definition, provide a concise definition first, then elaborate with details and examples.\n"
+        f"15. If the question is about a comparison, clearly compare the items using a table or bullet points.\n"
+        f"---\n"
+        f"Answer:"
+    )
+    return call_gemini_ai(prompt, max_tokens=700)
+
+
 
 def generate_enhanced_fallback_response(query, web_results, rag_context, conversation_context=""):
     """Generate comprehensive fallback response when AI APIs fail"""
@@ -1510,6 +1559,7 @@ def upload_file():
             success, message = add_document_to_rag_simple(text_content, file.filename, conversation_id)
 
             if success:
+                document_usage_tracker[conversation_id] = True
                 return jsonify({
                     'status': 'success',
                     'message': f'File "{file.filename}" uploaded successfully. {message}',
@@ -1527,6 +1577,8 @@ def upload_file():
         return jsonify({'status': 'error', 'error': f'Upload failed: {str(e)}'}), 500
 
 # Replace the handle_universal_search function:
+
+
 
 @app.route('/api/news', methods=['POST'])
 def handle_universal_search():
@@ -1571,6 +1623,7 @@ def handle_universal_search():
 
         print(f"DEBUG: Query for summary detection: '{query}'")
         print(f"DEBUG: is_document_summary_query: {is_document_summary_query(query)}")
+
         if is_document_summary_query(query):
             print("📝 Detected document summary query!")
             docs = conversation_documents.get(conversation['id'] if conversation else None, [])
@@ -1592,6 +1645,9 @@ def handle_universal_search():
                     if not summary:
                         summary = "The document could not be summarized due to insufficient content."
                 ai_response = summary
+                # --- ADD THIS LINE ---
+                if conversation and conversation['id'] in document_usage_tracker:
+                    document_usage_tracker[conversation['id']] = False
             if conversation_manager and conversation_manager.supabase and conversation:
                 try:
                     conversation_manager.save_message(
@@ -1649,71 +1705,121 @@ def handle_universal_search():
             else:
                 print("❌ Failed to fetch website content, falling back to regular search")
 
-        # --- KEY CHANGE: RAG FIRST, THEN WEB SEARCH USING RAG CONTEXT ---
-        print("🔄 STEP 1: Document Analysis (RAG)...")
-        rag_context = search_documents(query, 3, conversation['id'] if conversation else None)
-        print(f"✅ STEP 1 Complete: RAG context length: {len(rag_context) if rag_context else 0}")
+        # --- KEY CHANGE: Only use RAG if a document is uploaded for this conversation ---
+        docs = conversation_documents.get(conversation['id'] if conversation else None, [])
+        doc_allowed = False
+        if conversation and conversation['id'] in document_usage_tracker and document_usage_tracker[conversation['id']]:
+            doc_allowed = True
+        if not conversation:
+            conversation = conversation_manager.get_or_create_conversation(user_email, force_new=True)
+        if docs and len(docs) > 0 and doc_allowed:
+            print("🔄 STEP 1: Document Analysis (RAG)...")
+            rag_context = search_documents(query, 3, conversation['id'] if conversation else None)
+            print(f"✅ STEP 1 Complete: RAG context length: {len(rag_context) if rag_context else 0}")
+            document_usage_tracker[conversation['id']] = False
+            # If RAG context found, use it as the new query for web search
+            if rag_context and "No relevant" not in rag_context and "Document search error" not in rag_context:
+                doc_based_query = rag_context.split('|')[0][:200]
+                print(f"🌐 Using document context for web search: {doc_based_query}")
+                web_results = get_universal_web_search(doc_based_query, 1)
+            else:
+                print("🌐 No relevant document context, using original query for web search.")
+                web_results = get_universal_web_search(query, 1)
+            print(f"✅ STEP 2 Complete: Found {len(web_results)} web results")
 
-        # If RAG context found, use it as the new query for web search
-        if rag_context and "No relevant" not in rag_context and "Document search error" not in rag_context:
-            doc_based_query = rag_context.split('|')[0][:200]
-            print(f"🌐 Using document context for web search: {doc_based_query}")
-            web_results = get_universal_web_search(doc_based_query, 1)
+            print("🔄 STEP 3: AI Response Generation...")
+            ai_response = debug_response_generation(query, web_results, rag_context, conversation_context)
+            if not ai_response or len(ai_response.strip()) < 10:
+                print("❌ AI response is empty or too short, generating fallback...")
+                ai_response = f"Based on the current information about {query}, here's a comprehensive overview: " + \
+                             f"The analysis shows multiple factors are relevant to understanding {query}. " + \
+                             f"Current research indicates ongoing developments in this area. " + \
+                             f"For more specific information, please provide additional context about what aspect interests you most."
+            print(f"✅ STEP 3 Complete: Generated response length: {len(ai_response)} chars")
+            print(f"📝 Response preview: {ai_response[:150]}...")
+
+            if conversation_manager and conversation_manager.supabase and conversation:
+                try:
+                    used_rag = rag_context and "No relevant" not in rag_context and "Document search error" not in rag_context
+                    query_type = 'rag_search' if used_rag else 'general'
+                    conversation_manager.save_message(
+                        conversation['id'], 'assistant', ai_response, query_type,
+                        web_results, rag_context, ai_response
+                    )
+                    print("✅ Saved response to conversation")
+                except Exception as e:
+                    print(f"⚠️ Save error: {e}")
+
+            response_data = {
+                'status': 'success',
+                'result': ai_response,
+                'ai_response': ai_response,
+                'web_results': web_results,
+                'rag_context': rag_context,
+                'conversation_context': conversation_context,
+                'conversation_id': conversation['id'] if conversation else None,
+                'mode': 'rag_search',
+                'steps_completed': {
+                    'step1_web_search': len(web_results) > 0,
+                    'step2_document_analysis': len(rag_context) > 10 if rag_context else False,
+                    'step3_ai_generation': len(ai_response) > 10
+                },
+                'debug_info': {
+                    'query_processed': query,
+                    'web_results_count': len(web_results),
+                    'rag_context_length': len(rag_context) if rag_context else 0,
+                    'response_length': len(ai_response),
+                    'conversation_context_available': len(conversation_context) > 0,
+                    'conversation_id': conversation['id'] if conversation else None
+                },
+                'timestamp': datetime.now().isoformat()
+            }
+            print("✅ Response generated successfully - sending to frontend")
+            print(f"📤 Response data keys: {list(response_data.keys())}")
+            return jsonify(response_data)
         else:
-            print("🌐 No relevant document context, using original query for web search.")
-            web_results = get_universal_web_search(query, 1)
-        print(f"✅ STEP 2 Complete: Found {len(web_results)} web results")
-
-        print("🔄 STEP 3: AI Response Generation...")
-        ai_response = debug_response_generation(query, web_results, rag_context, conversation_context)
-        if not ai_response or len(ai_response.strip()) < 10:
-            print("❌ AI response is empty or too short, generating fallback...")
-            ai_response = f"Based on the current information about {query}, here's a comprehensive overview: " + \
-                         f"The analysis shows multiple factors are relevant to understanding {query}. " + \
-                         f"Current research indicates ongoing developments in this area. " + \
-                         f"For more specific information, please provide additional context about what aspect interests you most."
-        print(f"✅ STEP 3 Complete: Generated response length: {len(ai_response)} chars")
-        print(f"📝 Response preview: {ai_response[:150]}...")
-
-        if conversation_manager and conversation_manager.supabase and conversation:
-            try:
-                used_rag = rag_context and "No relevant" not in rag_context and "Document search error" not in rag_context
-                query_type = 'rag_search' if used_rag else 'general'
-                conversation_manager.save_message(
-                    conversation['id'], 'assistant', ai_response, query_type,
-                    web_results, rag_context, ai_response
-                )
-                print("✅ Saved response to conversation")
-            except Exception as e:
-                print(f"⚠️ Save error: {e}")
-
-        response_data = {
-            'status': 'success',
-            'result': ai_response,
-            'ai_response': ai_response,
-            'web_results': web_results,
-            'rag_context': rag_context,
-            'conversation_context': conversation_context,
-            'conversation_id': conversation['id'] if conversation else None,
-            'mode': 'regular_search',
-            'steps_completed': {
-                'step1_web_search': len(web_results) > 0,
-                'step2_document_analysis': len(rag_context) > 10 if rag_context else False,
-                'step3_ai_generation': len(ai_response) > 10
-            },
-            'debug_info': {
-                'query_processed': query,
-                'web_results_count': len(web_results),
-                'rag_context_length': len(rag_context) if rag_context else 0,
-                'response_length': len(ai_response),
-                'conversation_context_available': len(conversation_context) > 0,
-                'conversation_id': conversation['id'] if conversation else None
-            },
-            'timestamp': datetime.now().isoformat()
-        }
-        print("✅ Response generated successfully - sending to frontend")
-        print(f"📤 Response data keys: {list(response_data.keys())}")
-        return jsonify(response_data)
+            # No document uploaded: ONLY use Gemini AI for direct answer (web-like)
+            print("📄 No document uploaded for this conversation. Using Gemini AI web-only mode.")
+            ai_response = call_gemini_ai_web_only(query)
+            if not ai_response or len(ai_response.strip()) < 10:
+                ai_response = f"Based on the current information about {query}, here's a comprehensive overview: " + \
+                             f"The analysis shows multiple factors are relevant to understanding {query}. " + \
+                             f"Current research indicates ongoing developments in this area. " + \
+                             f"For more specific information, please provide additional context about what aspect interests you most."
+            if conversation_manager and conversation_manager.supabase and conversation:
+                try:
+                    conversation_manager.save_message(
+                        conversation['id'], 'assistant', ai_response, 'web_search_only',
+                        None, None, ai_response
+                    )
+                except Exception as e:
+                    print(f"⚠️ Save error: {e}")
+            response_data = {
+                'status': 'success',
+                'result': ai_response,
+                'ai_response': ai_response,
+                'web_results': None,
+                'rag_context': None,
+                'conversation_context': conversation_context,
+                'conversation_id': conversation['id'] if conversation else None,
+                'mode': 'web_search_only',
+                'steps_completed': {
+                    'step1_web_search': True,
+                    'step2_document_analysis': False,
+                    'step3_ai_generation': len(ai_response) > 10
+                },
+                'debug_info': {
+                    'query_processed': query,
+                    'web_results_count': 0,
+                    'rag_context_length': 0,
+                    'response_length': len(ai_response),
+                    'conversation_context_available': len(conversation_context) > 0,
+                    'conversation_id': conversation['id'] if conversation else None
+                },
+                'timestamp': datetime.now().isoformat()
+            }
+            print("✅ Web-only Gemini response generated successfully - sending to frontend")
+            return jsonify(response_data)
 
     except Exception as e:
         error_msg = str(e)
@@ -1726,6 +1832,7 @@ def handle_universal_search():
             'result': f"I encountered an error while processing your query about {query}. Please try again or rephrase your question.",
             'ai_response': f"I encountered an error while processing your query about {query}. Please try again or rephrase your question."
         })
+# ...existing code...
 # Complete the missing API endpoints
 @app.route('/api/conversations', methods=['POST'])
 def get_conversations():
