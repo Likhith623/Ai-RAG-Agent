@@ -960,7 +960,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
   }
 
   return (
-    <div className={`flex h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`}>
+    <div className={`relative flex h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`}>
       {/* Hidden file input */}
       <input
         type="file"
@@ -971,7 +971,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
       />
 
       {/* Enhanced Glass Sidebar */}
-      <div className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 flex flex-col overflow-hidden relative`}>
+      <div className={`fixed inset-y-0 left-0 z-30 w-80 flex flex-col overflow-hidden transition-all duration-300 transform md:relative md:transform-none ${sidebarOpen ? 'translate-x-0 md:w-80' : '-translate-x-full md:w-0'}`}>
         {/* Glass effect background */}
         <div className={`absolute inset-0 ${
           isDark 
@@ -990,16 +990,21 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                   Conversations
                 </span>
               </h2>
-              <button
-                onClick={startNewConversation}
- className={`w-12 h-10 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110 active:scale-95 backdrop-blur-sm flex items-center justify-center ${
-  isDark 
-    ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-yellow-400 hover:to-violet-400' 
-    : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-yellow-400 hover:to-violet-400' 
-}`}
-              >
-                <span className="text-lg">➕</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={startNewConversation}
+                  className={`w-12 h-10 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110 active:scale-95 backdrop-blur-sm flex items-center justify-center ${
+                    isDark
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-yellow-400 hover:to-violet-400'
+                      : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-yellow-400 hover:to-violet-400'
+                  }`}
+                >
+                  <span className="text-lg">➕</span>
+                </button>
+                <button onClick={() => setSidebarOpen(false)} className={`md:hidden p-2 rounded-xl ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100/50'} transition-all duration-200 hover:scale-110 backdrop-blur-sm`}>
+                  <span className={`text-2xl ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>X</span>
+                </button>
+              </div>
             </div>
             
             {/* User Info Card with better email handling */}
@@ -1099,12 +1104,15 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
           </div>
         </div>
       </div>
+      {/* Backdrop for mobile when sidebar is open */}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
+
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className={`${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-200/50'} border-b p-4 flex items-center justify-between transition-colors duration-300 shadow-sm backdrop-blur-xl`}>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className={`p-2 rounded-xl ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100/50'} transition-all duration-200 hover:scale-110 backdrop-blur-sm`}
@@ -1116,14 +1124,14 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                 <span className="text-lg animate-bounce">✨</span>
               </div>
               <div>
-                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent`}>AI Assistant</h1>
-                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>World-class AI conversations</p>
+                <h1 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent`}>AI Assistant</h1>
+                <p className={`text-xs hidden sm:block ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>World-class AI conversations</p>
               </div>
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 md:space-x-4">
+            <div className="hidden md:flex items-center space-x-2">
               <div className="flex space-x-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
@@ -1133,7 +1141,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
             </div>
             <button
               onClick={() => setIsDark(!isDark)}
-              className={`p-2 rounded-xl ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100/50'} transition-all duration-200 hover:scale-110 backdrop-blur-sm`}
+  className={`p-2 rounded-xl ${isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100/50'} transition-all duration-200 hover:scale-110 backdrop-blur-sm`}
             >
               <span className="text-xl">{isDark ? '☀️' : '🌙'}</span>
             </button>
@@ -1483,7 +1491,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
             ? 'bg-gradient-to-t from-gray-900 via-gray-800/95 to-gray-800/90 border-gray-700/30' 
             : 'bg-gradient-to-t from-white via-gray-50/95 to-gray-50/90 border-gray-200/50'
         } border-t backdrop-blur-2xl`}>
-          <div className="max-w-5xl mx-auto px-6 py-4">
+          <div className="max-w-5xl mx-auto px-2 sm:px-6 py-4">
             {/* Upload Status - Enhanced */}
             {uploadStatus && (
               <div className={`mb-4 p-4 rounded-2xl text-sm font-medium ${
@@ -1515,7 +1523,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
               isDark ? 'hover:border-blue-500/30' : 'hover:border-blue-300/50'
             }`}>
               
-              <div className="flex items-center space-x-3"> {/* Changed from items-end to items-center */}
+              <div className="flex items-center space-x-2 sm:space-x-3"> {/* Changed from items-end to items-center */}
                 {/* Text Input - Simplified */}
                 <div className="flex-1 relative group">
                   <textarea
@@ -1545,7 +1553,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                 <button
                   onClick={triggerFileUpload}
                   disabled={isUploading || isLoading}
-                  className={`group relative overflow-hidden px-6 py-4 rounded-2xl font-semibold transition-all duration-300 ${
+                  className={`group relative overflow-hidden p-4 sm:px-6 sm:py-4 rounded-2xl font-semibold transition-all duration-300 ${
                     isUploading || isLoading
                       ? isDark
                         ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
@@ -1556,7 +1564,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                   } backdrop-blur-sm transform hover:scale-105 active:scale-95 hover:shadow-2xl`}
                    style={{ minHeight: '56px' }} 
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-0 sm:space-x-2">
                     {isUploading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -1565,7 +1573,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                     ) : (
                       <>
                         <span className="text-xl group-hover:scale-110 transition-transform duration-200">📎</span>
-                        <span className="text-sm font-bold">Upload</span>
+                        <span className="hidden sm:inline text-sm font-bold">Upload</span>
                       </>
                     )}
                   </div>
@@ -1575,7 +1583,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                 <button
                   onClick={sendMessage}
                   disabled={isLoading || !input.trim()}
-                  className={`group relative overflow-hidden px-6 py-4 rounded-2xl font-semibold transition-all duration-300 ${
+                  className={`group relative overflow-hidden p-4 sm:px-6 sm:py-4 rounded-2xl font-semibold transition-all duration-300 ${
                     isLoading || !input.trim()
                       ? isDark
                         ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
@@ -1586,7 +1594,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                   } backdrop-blur-sm transform hover:scale-105 active:scale-95 hover:shadow-2xl`}
                     style={{ minHeight: '56px' }}
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-0 sm:space-x-2">
                     {isLoading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -1595,7 +1603,7 @@ const AIResponseGeneration = ({ aiResponse, isLoading = false }) => {
                     ) : (
                       <>
                         <span className="text-xl group-hover:scale-110 transition-transform duration-200">🚀</span>
-                        <span className="text-sm font-bold">Chat</span>
+                        <span className="hidden sm:inline text-sm font-bold">Chat</span>
                       </>
                     )
                     }
