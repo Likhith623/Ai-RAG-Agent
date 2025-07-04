@@ -190,7 +190,7 @@ class ConversationManager:
             return None
 
     # FIXED: Properly get conversation history for context
-    def get_conversation_history(self, conversation_id, limit=3):
+    def get_conversation_history(self, conversation_id, limit=7):
         if not self.supabase:
             return []
 
@@ -211,12 +211,12 @@ class ConversationManager:
     # FIXED: Build proper context string that's actually used
     def build_conversation_context(self, conversation_id):
         try:
-            history = self.get_conversation_history(conversation_id, limit=2)  # Last 2 exchanges
+            history = self.get_conversation_history(conversation_id, limit=7)  # Last 7 exchanges
             if not history:
                 return ""
 
             context_parts = []
-            for msg in history[-4:]:  # Last 4 messages max
+            for msg in history[-14:]:  # Last 14 messages max
                 if msg['role'] == 'user':
                     context_parts.append(f"Previous User Question: {msg['content'][:150]}")
                 elif msg['role'] == 'assistant':
@@ -293,10 +293,10 @@ except Exception as e:
 
 # Keys
 
-os.environ['SERPER_API_KEY'] = os.getenv('SERPER_API_KEY', 'your_key')
-os.environ['NEWSAPI_KEY'] = os.getenv('NEWSAPI_KEY', 'your_key')
-os.environ['NOVITA_API_KEY'] = os.getenv('NOVITA_API_KEY', 'your_key')
-os.environ['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', 'your_key')
+os.environ['SERPER_API_KEY'] = os.getenv('SERPER_API_KEY', '466566d438018e3a7e3c81eec446ad3de2fe660a')
+os.environ['NEWSAPI_KEY'] = os.getenv('NEWSAPI_KEY', '6db5db5f7f834630996ac6b8bfd7dfc8')
+os.environ['NOVITA_API_KEY'] = os.getenv('NOVITA_API_KEY', 'ff98a4b3-3628-4433-8231-f3a0017ccd7c')
+os.environ['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', 'AIzaSyDOmcCIWHcLM1KpaBI04T5BBIitDZ-WfT8')
 # Add this after the API keys section:
 
 # Replace the existing call_GEMINI_ai function with this:
@@ -329,12 +329,12 @@ def call_gemini_ai(prompt, max_tokens=700):
         traceback.print_exc()
         return None
 
-# ...existing code...
 
-def call_gemini_ai_web_only(query):
+def call_gemini_ai_web_only(query, conversation_context=""):
     """
     Call Gemini AI for a direct answer to a user's query (web-only, no document context).
     Uses a highly detailed, accurate prompt for maximum precision and completeness.
+    Optionally includes previous conversation context.
     """
     print("🤖 [Web-only] Calling Gemini AI for direct query...")
 
@@ -346,11 +346,17 @@ def call_gemini_ai_web_only(query):
     for i, result in enumerate(web_results):
         web_refs += f"{i+1}. {result.get('title', '')}\n   {result.get('description', '')}\n   {result.get('url', '')}\n"
 
+    # Add conversation context if available
+    context_section = ""
+    if conversation_context and len(conversation_context.strip()) > 10:
+        context_section = f"\n\nPrevious Conversation Context:\n{conversation_context}\n"
+
     prompt = (
         f"You are an advanced, highly accurate, and reliable AI assistant. "
         f"Your task is to answer the following user question with depth, clarity, and structure, "
         f"using only the most up-to-date and relevant information from the provided web search results. "
-        f"Always synthesize information from multiple sources, provide clear explanations, and cite facts or links where appropriate.\n\n"
+        f"Always synthesize information from multiple sources, provide clear explanations, and cite facts or links where appropriate."
+        f"{context_section}\n\n"
         f"User Question: \"{query}\"\n\n"
         f"Web Search Results:\n"
         f"{web_refs}\n"
@@ -362,7 +368,7 @@ def call_gemini_ai_web_only(query):
         f"5. If the question is about a person, summarize the most relevant profiles or pages, including links.\n"
         f"6. If the question is about a process, method, or topic, explain it step-by-step or in detail, referencing the sources.\n"
         f"7. If the search results are ambiguous or cover multiple topics, clarify the most likely intent and answer accordingly.\n"
-        f"8. Do NOT ask the user for more information. Do NOT reference uploaded documents or previous conversations.\n"
+        f"8. If previous conversation context is provided, use it to make your answer more relevant and coherent. Do NOT reference uploaded documents.\n"
         f"9. If no relevant information is found, say so politely and suggest what the user could try next.\n"
         f"10. Always write in a professional, neutral, and helpful tone.\n"
         f"11. Format the answer for easy reading, using markdown if appropriate.\n"
@@ -374,6 +380,8 @@ def call_gemini_ai_web_only(query):
         f"Answer:"
     )
     return call_gemini_ai(prompt, max_tokens=700)
+
+
 
 
 
@@ -1780,7 +1788,7 @@ def handle_universal_search():
         else:
             # No document uploaded: ONLY use Gemini AI for direct answer (web-like)
             print("📄 No document uploaded for this conversation. Using Gemini AI web-only mode.")
-            ai_response = call_gemini_ai_web_only(query)
+            ai_response = call_gemini_ai_web_only(query, conversation_context)
             if not ai_response or len(ai_response.strip()) < 10:
                 ai_response = f"Based on the current information about {query}, here's a comprehensive overview: " + \
                              f"The analysis shows multiple factors are relevant to understanding {query}. " + \
@@ -2580,5 +2588,3 @@ if __name__ == '__main__':
         app.run(debug=True, host='0.0.0.0', port=port)
     except Exception as e:
         print(f"❌ Server error: {e}")
-
-
