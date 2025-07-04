@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)
 ![Flask](https://img.shields.io/badge/Flask-2.3+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 
 **An intelligent, context-aware AI assistant that combines document understanding, real-time web search, and long-term memory to deliver smarter, more grounded answers.**
 
@@ -348,17 +348,6 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ---
 
-## 📋 Roadmap
-
-- [ ] **Multi-language Support** - Interface in multiple languages
-- [ ] **Advanced RAG Techniques** - Implement HyDE, CoT reasoning
-- [ ] **Voice Interface** - Speech-to-text and text-to-speech
-- [ ] **Team Collaboration** - Multi-user workspaces
-- [ ] **API Rate Limiting** - Enhanced security and usage controls
-- [ ] **Mobile App** - React Native implementation
-- [ ] **Plugin System** - Extensible architecture for custom integrations
-
----
 
 ## 🐛 Troubleshooting
 
@@ -401,11 +390,6 @@ node --version  # Should be 18+
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
 
 ## 👨‍💻 Author
 
