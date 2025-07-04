@@ -40,7 +40,7 @@ When you ask a question after uploading a document:
 - **Structured Output**: Clear, organized summaries with key points
 - **Content Extraction**: Smart parsing of web content
 
-### 💬 Smart Chat (ChatGPT++ Mode)
+### 💬 Smart Chat (Advanced Mode)
 - **Enhanced Capabilities**: Outperforms standard chatbots in real-world scenarios
 - **Real-time Information**: Access to current events, people, and concepts
 - **Context Awareness**: Maintains conversation flow and memory
